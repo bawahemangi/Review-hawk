@@ -803,7 +803,7 @@ def get_github_client_for_repo(repository: Any) -> Github:
             with open(private_key_path, "r", encoding="utf-8") as fh:
                 private_key = fh.read()
             integration = GithubIntegration(
-                integration_id=int(app_id),
+                integration_id=str(app_id).strip(),
                 private_key=private_key,
             )
             install = integration.get_installation(

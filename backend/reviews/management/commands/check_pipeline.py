@@ -142,7 +142,8 @@ class Command(BaseCommand):
         from reviews.github_app import GitHubAccessError, installation_for_repo
         try:
             from github import Auth, GithubIntegration
-            auth = Auth.AppAuth(int(app_id), Path(key_path).read_text())
+            
+            auth = Auth.AppAuth(str(app_id).strip(), Path(key_path).read_text())
             installs = list(GithubIntegration(auth=auth).get_installations())
         except Exception as exc:  # noqa: BLE001
             self.out(BAD, f"Could not authenticate as the GitHub App ({exc.__class__.__name__}). "
@@ -151,7 +152,14 @@ class Command(BaseCommand):
         if not installs:
             self.out(BAD, "The GitHub App is not installed on any account. Open the app page -> Install App.")
         for inst in installs:
-            self.out(OK, f"Installed on {inst.account.login} (installation {inst.id}, repos: {inst.repository_selection})")
+            account = inst.raw_data.get("account") or {}
+            login = account.get("login", "Unknown account")
+            repo_selection = inst.raw_data.get("repository_selection", "Unknown")
+
+            self.out(
+                OK,
+                f"Installed on {login} (installation {inst.id}, repos: {repo_selection})"
+            )
         for repo in Repository.objects.filter(is_enabled=True):
             try:
                 installation_id, _ = installation_for_repo(repo.owner, repo.name)
@@ -162,24 +170,38 @@ class Command(BaseCommand):
     # -- 5. gemini -----------------------------------------------------------
     def check_gemini(self):
         self.title("5. Gemini")
-        key, model = config("GEMINI_API_KEY", default=""), config("GEMINI_MODEL", default="")
+
+        key = config("GEMINI_API_KEY", default="")
+
         from reviews import llm_reviewer
-        model = model or llm_reviewer.GEMINI_MODEL
+
+        model = config(
+            "GEMINI_MODEL",
+            default=llm_reviewer.GEMINI_MODEL
+        )
+
         if not key or llm_reviewer.genai is None:
-            self.out(WARN, "Skipped (no API key, or google-generativeai is not installed)")
+            self.out(BAD, "Gemini API key or google-genai SDK is missing.")
             return
+
         try:
-            llm_reviewer.genai.configure(api_key=key)
-            names = {m.name.removeprefix("models/") for m in llm_reviewer.genai.list_models()
-                     if "generateContent" in getattr(m, "supported_generation_methods", [])}
-        except Exception as exc:  # noqa: BLE001
-            self.out(BAD, f"Could not reach Gemini ({exc.__class__.__name__}): check GEMINI_API_KEY and your network")
-            return
-        if model in names:
-            self.out(OK, f"Gemini model '{model}' exists and supports generateContent")
-        else:
-            flash = ", ".join(sorted(n for n in names if "flash" in n)[:6]) or "none found"
-            self.out(BAD, f"Gemini model '{model}' is not available to this API key. Set GEMINI_MODEL to one of: {flash}")
+            client = llm_reviewer.genai.Client(api_key=key)
+
+            response = client.models.generate_content(
+                model=model,
+                contents="Reply with exactly: OK"
+            )
+
+            if response.text:
+                self.out(OK, f"Gemini model '{model}' is responding.")
+            else:
+                self.out(BAD, "Gemini returned an empty response.")
+
+        except Exception as exc:
+            self.out(
+                BAD,
+                f"Gemini request failed ({exc.__class__.__name__}): {str(exc)[:200]}"
+            )
 
     # -- 6. data -------------------------------------------------------------
     def check_data(self):

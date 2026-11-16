@@ -56,7 +56,7 @@ def _app_auth() -> Auth.AppAuth:
             "Check GITHUB_PRIVATE_KEY_PATH."
         ) from exc
     try:
-        return Auth.AppAuth(int(GITHUB_APP_ID), private_key)
+        return Auth.AppAuth(str(GITHUB_APP_ID).strip(), private_key)
     except ValueError as exc:
         raise GitHubAccessError("GITHUB_APP_ID must be a number.") from exc
 

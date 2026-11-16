@@ -146,6 +146,25 @@ def sync_open_pull_requests(
             direction="desc",
         )
 
+        installation_id = None
+
+        try:
+            from reviews.github_app import _app_auth
+            from github import GithubIntegration
+
+            integration = GithubIntegration(auth=_app_auth())
+            installation = integration.get_installation(
+                db_repo.owner,
+                db_repo.name,
+            )
+            installation_id = installation.id
+
+        except Exception:
+            logger.exception(
+                "Could not retrieve GitHub App installation for %s",
+                db_repo.full_name,
+            )
+
         for gh_pr in itertools.islice(pulls, limit):
             head = getattr(gh_pr, "head", None)
             base = getattr(gh_pr, "base", None)
@@ -270,7 +289,8 @@ def sync_open_pull_requests(
                 pull_request=db_pr,
                 head_sha=head_sha,
                 defaults={
-                    "status": Review.Status.PENDING
+                    "status": Review.Status.PENDING,
+                    "installation_id": installation_id,
                 },
             )
 

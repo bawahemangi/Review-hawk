@@ -81,7 +81,7 @@ class ListGitHubReposView(APIView):
                     "default_branch": repo.default_branch or "main",
                     "is_private": repo.private,
                     "html_url": repo.html_url,
-                    "description": repo.description,
+                    "description": repo.description or "",
                     "registered": repo.id in registered_ids,
                 }
             )
@@ -163,16 +163,18 @@ class RegisterWebhookView(APIView):
 
             # ── Get-or-create the local DB row, mark enabled ───────────────
             db_repo, created = Repository.objects.get_or_create(
-                github_repo_id=github_repo_id,
-                defaults={
-                    "user": request.user,
-                    "owner": owner,
-                    "name": name,
-                    "default_branch": gh_repo.default_branch or "main",
-                    "is_private": gh_repo.private,
-                    "is_enabled": True,
-                },
-            )
+            github_repo_id=github_repo_id,
+            defaults={
+                "user": request.user,
+                "owner": owner,
+                "name": name,
+                "default_branch": gh_repo.default_branch or "main",
+                "is_private": gh_repo.private,
+                "description": gh_repo.description or "",
+                "html_url": gh_repo.html_url or "",
+                "is_enabled": True,
+            },
+        )
 
             if not created:
                 db_repo.is_enabled = True

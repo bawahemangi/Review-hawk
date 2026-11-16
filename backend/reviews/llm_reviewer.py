@@ -26,9 +26,11 @@ from datetime import datetime, timezone
 from typing import Optional
 
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types as genai_types
 except ImportError:  # keeps the server importable if the package is missing
     genai = None
+    genai_types = None
 import requests as http_requests
 from decouple import config
 from github import Github, GithubException, GithubIntegration
@@ -392,19 +394,18 @@ def _call_gemini(user_prompt: str) -> tuple[str, int, int]:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY is not configured.")
     if genai is None:
-        raise RuntimeError("The google-generativeai package is not installed (pip install google-generativeai).")
+        raise RuntimeError("The google-genai package is not installed (pip install google-genai).")
 
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(
-        model_name=GEMINI_MODEL,
-        system_instruction=SYSTEM_PROMPT,
-        generation_config=genai.types.GenerationConfig(
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    response = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=user_prompt,
+        config=genai_types.GenerateContentConfig(
+            system_instruction=SYSTEM_PROMPT,
             temperature=0.2,         # low randomness for deterministic reviews
             response_mime_type="application/json",
         ),
     )
-
-    response = model.generate_content(user_prompt)
 
     raw_text = response.text or ""
     usage = response.usage_metadata
@@ -529,7 +530,7 @@ def _get_github_client(review: Review) -> Github:
             with open(GITHUB_PRIVATE_KEY_PATH, "r") as fh:
                 private_key = fh.read()
             integration = GithubIntegration(
-                integration_id=int(GITHUB_APP_ID),
+                integration_id=str(GITHUB_APP_ID).strip(),
                 private_key=private_key,
             )
             install = integration.get_installation(

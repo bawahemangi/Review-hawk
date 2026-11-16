@@ -13,6 +13,8 @@ class Repository(models.Model):
     name = models.CharField(max_length=100)
     default_branch = models.CharField(max_length=100, default="main")
     is_private = models.BooleanField(default=False)
+    description = models.TextField(blank=True, default="")
+    html_url = models.URLField(blank=True, default="")
     webhook_id = models.BigIntegerField(null=True, blank=True)  # set once webhook is registered
     is_enabled = models.BooleanField(default=False)  # bot only reviews when True
     installation_id = models.BigIntegerField(null=True, blank=True)  # GitHub App installation covering this repo
@@ -55,7 +57,7 @@ class PullRequest(models.Model):
     title = models.CharField(max_length=500)
     author = models.CharField(max_length=100)
     state = models.CharField(max_length=10, choices=State.choices, default=State.OPEN)
-    html_url = models.URLField(blank=True)
+    html_url = models.URLField(blank=True, default="")
     latest_head_sha = models.CharField(max_length=40)  # updated on every push
 
     # Extended metadata (populated from GitHub API on registration/sync)
